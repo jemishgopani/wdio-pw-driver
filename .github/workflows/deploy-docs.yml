@@ -56,6 +56,12 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          # Auto-enable Pages on first run instead of requiring a manual
+          # Settings → Pages → Source = GitHub Actions toggle. Needs the
+          # `pages: write` permission already granted at the workflow
+          # level.
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
