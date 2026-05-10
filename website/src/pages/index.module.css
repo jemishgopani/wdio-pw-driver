@@ -1,0 +1,126 @@
+/**
+ * Hero + features + quickstart styles for the landing page. CSS modules
+ * are locally scoped; brand colors come from `--ifm-color-primary` /
+ * `--pw-accent` defined in src/css/custom.css.
+ */
+
+/* ---------- HERO ----------------------------------------------------- */
+
+.hero {
+  padding: 6rem 0 5rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(13, 148, 136, 0.10), transparent 45%),
+    radial-gradient(circle at 80% 80%, rgba(219, 39, 119, 0.08), transparent 50%),
+    var(--ifm-background-color);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.heroTitle {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, var(--ifm-color-primary-darkest), var(--pw-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-theme='dark'] .heroTitle {
+  background: linear-gradient(135deg, var(--ifm-color-primary-light), var(--pw-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.heroSubtitle {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  color: var(--ifm-color-content-secondary);
+  margin: 0 auto 2.5rem;
+  max-width: 640px;
+  line-height: 1.5;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.secondaryButton {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary-darkest);
+}
+[data-theme='dark'] .secondaryButton {
+  color: var(--ifm-color-primary-light);
+}
+
+@media screen and (max-width: 996px) {
+  .hero { padding: 4rem 1.5rem 3rem; }
+}
+
+/* ---------- FEATURES -------------------------------------------------- */
+
+.features {
+  padding: 5rem 0 4rem;
+}
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.featureCard {
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 14px;
+  padding: 1.5rem 1.5rem 1.25rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.featureCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.10);
+  border-color: var(--ifm-color-primary);
+}
+
+.featureCard h3 {
+  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+  color: var(--ifm-color-primary-darkest);
+}
+[data-theme='dark'] .featureCard h3 {
+  color: var(--ifm-color-primary-lighter);
+}
+
+.featureCard p {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--ifm-color-content-secondary);
+  margin: 0;
+}
+
+/* ---------- QUICKSTART ----------------------------------------------- */
+
+.quickstart {
+  padding: 0 0 6rem;
+}
+
+.quickstart h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.quickstartFooter {
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 0.95rem;
+  color: var(--ifm-color-content-secondary);
+}

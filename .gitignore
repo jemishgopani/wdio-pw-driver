@@ -1,0 +1,13 @@
+node_modules/
+build/
+coverage/
+traces/
+*.log
+*.tgz
+.DS_Store
+.eslintcache
+.tsbuildinfo
+.vscode/
+.idea/
+.env
+.env.local

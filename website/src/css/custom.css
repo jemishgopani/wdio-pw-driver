@@ -1,0 +1,105 @@
+/**
+ * wdio-pw-driver brand palette — same teal/magenta as the
+ * mochawesome-reporter fork's HTML report. Primary teal = #0d9488 (light)
+ * / #14b8a6 (dark) for proper contrast on each background.
+ */
+
+:root {
+  /* Brand primary — teal */
+  --ifm-color-primary: #0d9488;
+  --ifm-color-primary-dark: #0c857a;
+  --ifm-color-primary-darker: #0b7d73;
+  --ifm-color-primary-darkest: #0f766e;
+  --ifm-color-primary-light: #14b3a3;
+  --ifm-color-primary-lighter: #1cbfae;
+  --ifm-color-primary-lightest: #34d8c7;
+
+  /* Custom brand accents (used in the navbar gradient + key callouts) */
+  --pw-accent: #db2777;          /* pink — banner gradient end */
+  --pw-accent-soft: #f9a8d4;
+
+  /* Type + spacing */
+  --ifm-font-family-base: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  --ifm-font-family-monospace: 'SF Mono', Menlo, Consolas, monospace;
+  --ifm-code-font-size: 90%;
+  --ifm-code-padding-vertical: 0.15rem;
+  --ifm-code-padding-horizontal: 0.4rem;
+
+  /* Code block highlight */
+  --docusaurus-highlighted-code-line-bg: rgba(13, 148, 136, 0.10);
+}
+
+[data-theme='dark'] {
+  /* Brand primary — teal-400 for better contrast on slate-900 */
+  --ifm-color-primary: #14b8a6;
+  --ifm-color-primary-dark: #11a193;
+  --ifm-color-primary-darker: #109789;
+  --ifm-color-primary-darkest: #0d7c71;
+  --ifm-color-primary-light: #2ed3c1;
+  --ifm-color-primary-lighter: #3dd8c8;
+  --ifm-color-primary-lightest: #67e0d2;
+
+  --pw-accent: #ec4899;
+
+  --ifm-background-color: #0f172a;
+  --ifm-background-surface-color: #1e293b;
+  --ifm-color-content: #e2e8f0;
+  --ifm-color-content-secondary: #94a3b8;
+
+  --docusaurus-highlighted-code-line-bg: rgba(20, 184, 166, 0.18);
+}
+
+/* Brand-tinted gradient strip across the navbar bottom border */
+.navbar {
+  border-bottom: 2px solid transparent;
+  background-image:
+    linear-gradient(var(--ifm-navbar-background-color), var(--ifm-navbar-background-color)),
+    linear-gradient(90deg, var(--ifm-color-primary), var(--pw-accent));
+  background-clip: padding-box, border-box;
+  background-origin: border-box;
+}
+
+/* Soften code blocks a touch */
+pre code {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* Inline code in body — subtle tinted bg, brand color */
+:not(pre) > code {
+  background: rgba(13, 148, 136, 0.08);
+  color: var(--ifm-color-primary-darkest);
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 4px;
+}
+[data-theme='dark'] :not(pre) > code {
+  background: rgba(20, 184, 166, 0.12);
+  color: var(--ifm-color-primary-light);
+  border-color: rgba(20, 184, 166, 0.25);
+}
+
+/* Sidebar hover/active states use the brand */
+.menu__link--active {
+  color: var(--ifm-color-primary-darkest);
+  font-weight: 600;
+}
+[data-theme='dark'] .menu__link--active {
+  color: var(--ifm-color-primary-lighter);
+}
+
+/* Tighten table padding for our many small reference tables */
+table thead th {
+  background: rgba(13, 148, 136, 0.06);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+[data-theme='dark'] table thead th {
+  background: rgba(20, 184, 166, 0.10);
+}
+
+/* Footer badge feel */
+.footer--dark {
+  --ifm-footer-background-color: #0f172a;
+  --ifm-footer-link-color: var(--ifm-color-primary-light);
+  --ifm-footer-color: #94a3b8;
+}

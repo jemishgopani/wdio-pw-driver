@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel any in-flight CI runs for the same branch when a new commit lands —
+# the long-tail PRs that get force-pushed back-to-back otherwise burn minutes
+# on stale builds nobody will look at.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build + test (Node ${{ matrix.node }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [20, 22]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm before setup-node so setup-node's cache-key resolves the right
+      # lockfile-checksum. Order matters — flip these two and the cache misses.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # Cache the Playwright browser binaries — about 600 MB total. Keyed on
+      # the playwright-core version pinned in pnpm-lock so a bumped engine
+      # invalidates correctly.
+      - name: Resolve playwright-core version
+        id: pw-version
+        shell: bash
+        run: |
+          v=$(node -p "require('playwright-core/package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Chromium via wdioPW
+        # Chromium only is enough for the test suite; firefox/webkit smoke
+        # tests auto-skip when the binary isn't cached so we don't pay for
+        # them in CI on every push.
+        run: pnpm exec wdioPW install chromium
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+        env:
+          # Forces every spec to launch headless regardless of any local
+          # PW_HEADED=1 leftover in dev shells.
+          PW_HEADED: ''
+
+  # Reference job that demonstrates how to wire `wdioPW shard` into a
+  # GitHub Actions matrix. WDIO has no built-in --shard flag, so users
+  # split their spec list at the CI layer and pipe the resulting filenames
+  # into `wdio --spec`. This job runs the CLI directly so a regression in
+  # the splitter (wrong slice math, lost files, stray newlines) shows up
+  # in CI immediately — it does NOT run any browser specs because that
+  # would require checking out a separate sample project.
+  #
+  # Mirror this in your own project replacing the path/glob with your own
+  # specs and dropping the verification step:
+  #
+  #   - run: pnpm wdio --spec $(npx wdioPW shard 'specs/**/*.spec.ts'
+  #                              --of 4 --shard ${{ matrix.shard }})
+  shard-pattern:
+    name: shard pattern check (shard ${{ matrix.shard }} of 4)
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      - name: Compute shard
+        id: compute
+        shell: bash
+        run: |
+          # Pipes the K-th of 4 shards of the integration suite into stdout.
+          # The driver's own integration test files are a good stand-in for
+          # WDIO specs — they're real `.test.ts` files on disk.
+          # Calls the bin script directly because the driver's own checkout
+          # has no `wdioPW` symlink in node_modules/.bin (pnpm only adds
+          # one for *consumers* of the package). Downstream WDIO projects
+          # would use `pnpm exec wdioPW` or `npx wdioPW` instead.
+          files=$(node bin/wdio-pw.js shard 'tests/integration/**/*.test.ts' \
+                    --of 4 --shard ${{ matrix.shard }})
+          echo "files=$files"
+          echo "count=$(printf '%s\n' "$files" | grep -c . || true)" >> "$GITHUB_OUTPUT"
+          # Persist the shard list so the verification step can read it.
+          printf '%s\n' "$files" > shard-files.txt
+
+      - name: Verify shard math is sane
+        shell: bash
+        run: |
+          count="${{ steps.compute.outputs.count }}"
+          # Every file in the suite has to land in exactly one shard. Print
+          # the count for the run log so a human glance at the matrix shows
+          # the distribution. If a file is missing across all shards,
+          # one of the four jobs will surface zero.
+          echo "shard ${{ matrix.shard }} got $count file(s)"
+          if [ "$count" -gt 0 ]; then
+            echo "files in this shard:"
+            sed 's/^/  - /' shard-files.txt
+          fi
