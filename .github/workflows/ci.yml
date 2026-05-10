@@ -66,7 +66,13 @@ jobs:
         # Chromium only is enough for the test suite; firefox/webkit smoke
         # tests auto-skip when the binary isn't cached so we don't pay for
         # them in CI on every push.
-        run: pnpm exec wdioPW install chromium
+        #
+        # Invoked via `node` directly rather than `pnpm exec`: the package's
+        # OWN bin (`wdioPW`) isn't auto-linked into `node_modules/.bin/` by
+        # `pnpm install` — that linking only happens for installed
+        # dependencies, not the package itself. The script depends only on
+        # `playwright-core` + Node built-ins, so it runs fine pre-build.
+        run: node ./bin/wdio-pw.js install chromium
 
       - name: Lint
         run: pnpm lint
