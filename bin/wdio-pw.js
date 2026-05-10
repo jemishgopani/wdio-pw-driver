@@ -290,8 +290,17 @@ function doctor() {
   check(`Node.js  ${bold(process.version)}`, process.versions.node.split('.')[0] >= 18, process.versions.node.split('.')[0] < 18 ? 'PW requires Node 18+' : '')
   check(`OS  ${bold(`${platform()} (${arch()})`)}`, true)
 
-  console.log('\n' + header('Browser binaries') + dim('  (~/Library/Caches/ms-playwright/)'))
-  const cacheRoot = join(homedir(), 'Library', 'Caches', 'ms-playwright')
+  // Playwright's browser cache lives in a different place per platform
+  // (and `PLAYWRIGHT_BROWSERS_PATH` overrides all of them). Resolve here
+  // so the check works on linux runners and Windows users, not just mac.
+  const cacheRoot = (() => {
+    if (process.env.PLAYWRIGHT_BROWSERS_PATH) return process.env.PLAYWRIGHT_BROWSERS_PATH
+    const p = platform()
+    if (p === 'darwin') return join(homedir(), 'Library', 'Caches', 'ms-playwright')
+    if (p === 'win32') return join(homedir(), 'AppData', 'Local', 'ms-playwright')
+    return join(homedir(), '.cache', 'ms-playwright')
+  })()
+  console.log('\n' + header('Browser binaries') + dim(`  (${cacheRoot}/)`))
   if (!existsSync(cacheRoot)) {
     allOk = check('cache directory', false, 'not found — run `wdioPW install`') && allOk
   } else {
