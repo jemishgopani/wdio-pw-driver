@@ -1,0 +1,119 @@
+name: Examples (nightly)
+
+# Runs the example projects under examples/* against the LIVE
+# `wdio-pw-driver` build. Catches regressions that the unit/integration
+# suites can't — real public sites with real network latency, real DOM
+# mutations, real animations.
+#
+# Trigger:
+#  - nightly cron at 03:00 UTC
+#  - on PR change to examples/ or to driver source files
+#  - manual via workflow_dispatch
+#
+# **Non-blocking by default**: a failure here doesn't gate driver PRs.
+# It surfaces real-world breakage so we can investigate, but a flake on
+# saucedemo.com (third-party site) shouldn't stop us shipping a driver
+# fix. To make it blocking later, change `continue-on-error: true` →
+# false on the matrix step.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/**'
+      - 'src/**'
+      - 'bin/**'
+      - '.github/workflows/examples-nightly.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: examples-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  saucedemo:
+    name: SauceDemo example (Node ${{ matrix.node }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: [22]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            examples/saucedemo/pnpm-lock.yaml
+
+      # Build + pack the driver first so the example's `file:../..` dep
+      # picks up our latest changes (rather than whatever was published).
+      - name: Install driver deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build driver
+        run: pnpm build
+
+      # Now install the example's deps. The `file:../..` reference will
+      # resolve to the freshly-built driver in this checkout.
+      - name: Install example deps
+        working-directory: examples/saucedemo
+        run: pnpm install --no-frozen-lockfile
+
+      # Cache + install Playwright Chromium for the example's pinned
+      # playwright-core version (which may differ from the driver's
+      # pinned version — examples use ^1.40 to demonstrate users can pin).
+      - name: Resolve example's playwright-core version
+        id: pw-version
+        working-directory: examples/saucedemo
+        shell: bash
+        run: |
+          v=$(node -p "require('playwright-core/package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Chromium for example
+        working-directory: examples/saucedemo
+        run: node node_modules/playwright-core/cli.js install chromium
+
+      - name: Run SauceDemo suite
+        working-directory: examples/saucedemo
+        run: pnpm test
+        env:
+          HEADLESS: 'true'
+
+      # On failure, upload traces + videos so we can debug after the run.
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saucedemo-failure-${{ runner.os }}-node${{ matrix.node }}
+          path: |
+            examples/saucedemo/traces/
+            examples/saucedemo/videos/
+          retention-days: 7

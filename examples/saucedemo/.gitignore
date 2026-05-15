@@ -1,0 +1,8 @@
+node_modules/
+.wdio-vscode-service/
+allure-results/
+logs/
+traces/
+videos/
+*.log
+.DS_Store
