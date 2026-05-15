@@ -230,7 +230,6 @@ async function findChildElementViaQuerySelector(
   selector: string,
 ): Promise<ElementReference | { error: string; message: string }> {
   const deadline = Date.now() + ctx.session.implicitTimeout
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       const handle = await parent.evaluateHandle(

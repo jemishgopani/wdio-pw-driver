@@ -117,6 +117,30 @@ export interface PWOptions {
   strictSelectors?: boolean
 
   /**
+   * Whether `PWService` should suppress WDIO's automatic chromedriver /
+   * geckodriver / edgedriver download.
+   *
+   * Default: `true`. With this on, `PWService.onPrepare` writes a sentinel
+   * value to `wdio:chromedriverOptions.binary` (and the geckodriver /
+   * edgedriver equivalents). That trips the truthy-binary guard in
+   * `@wdio/utils` (`mapCapabilities` at `build/node.js:457`), which
+   * filters the capability out of `setupDriver`'s download queue.
+   *
+   * Why: our driver dispatches every command to `playwright-core`
+   * in-process — the downloaded WebDriver binary is never invoked and
+   * sits on disk as ~10 MB of cache for nothing.
+   *
+   * Set to `false` only if you genuinely need WDIO's chromedriver path
+   * for a mixed-protocol multiremote setup (some caps go through our
+   * driver, some go through real WebDriver).
+   *
+   * Browser binaries themselves (Chrome / Firefox) are already skipped
+   * via the binary-injection logic — see `writeBinary` above. Playwright's
+   * bundled binaries are used instead; install them with `npx wdioPW install`.
+   */
+  skipDriverDownload?: boolean
+
+  /**
    * Whether `PWService` should transparently override a small set of WDIO
    * commands (`click`, `waitForExist`, `waitForDisplayed`) so they use
    * Playwright's in-page actionability primitives instead of WDIO's

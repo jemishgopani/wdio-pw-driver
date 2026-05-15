@@ -102,4 +102,52 @@ describe('PWService.onPrepare', () => {
     await expect(svc.onPrepare(FAKE_CONFIG, caps)).resolves.toBeUndefined()
     expect(caps['wdio:pwOptions']).toBeUndefined()
   })
+
+  it('suppresses WDIO driver downloads by default', async () => {
+    // Default behavior: PWService writes a sentinel into all three driver
+    // option slots. WDIO's mapCapabilities (in @wdio/utils) sees the
+    // truthy `binary` field and filters this capability out of
+    // setupDriver — no chromedriver / geckodriver / edgedriver download.
+    const svc = new PWService()
+    const caps: Record<string, unknown> = { browserName: 'chromium' }
+    await svc.onPrepare(FAKE_CONFIG, caps)
+
+    expect(caps['wdio:chromedriverOptions']).toMatchObject({ binary: expect.any(String) })
+    expect(caps['wdio:geckodriverOptions']).toMatchObject({ binary: expect.any(String) })
+    expect(caps['wdio:edgedriverOptions']).toMatchObject({ binary: expect.any(String) })
+    // Marker value is clearly synthetic (so it stands out in logs).
+    const marker = (caps['wdio:chromedriverOptions'] as { binary: string }).binary
+    expect(marker).toContain('wdio-pw-driver')
+  })
+
+  it('preserves user-provided driver binary paths', async () => {
+    // A user who provides a real chromedriver binary on purpose (e.g.,
+    // testing a custom workflow that needs both) keeps that path. We
+    // only fill empty slots.
+    const svc = new PWService()
+    const caps: Record<string, unknown> = {
+      browserName: 'chromium',
+      'wdio:chromedriverOptions': { binary: '/my/chromedriver' },
+    }
+    await svc.onPrepare(FAKE_CONFIG, caps)
+
+    expect(caps['wdio:chromedriverOptions']).toEqual({ binary: '/my/chromedriver' })
+    // Other driver slots are still suppressed.
+    expect(caps['wdio:geckodriverOptions']).toMatchObject({ binary: expect.any(String) })
+  })
+
+  it('respects skipDriverDownload:false escape hatch', async () => {
+    // Mixed-protocol multiremote setups where this cap legitimately
+    // needs WDIO's chromedriver path can opt out.
+    const svc = new PWService()
+    const caps: Record<string, unknown> = {
+      browserName: 'chromium',
+      'wdio:pwOptions': { skipDriverDownload: false },
+    }
+    await svc.onPrepare(FAKE_CONFIG, caps)
+
+    expect(caps['wdio:chromedriverOptions']).toBeUndefined()
+    expect(caps['wdio:geckodriverOptions']).toBeUndefined()
+    expect(caps['wdio:edgedriverOptions']).toBeUndefined()
+  })
 })

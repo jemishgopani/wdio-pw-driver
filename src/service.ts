@@ -32,8 +32,24 @@ type CapsRecord = Record<string, unknown> & {
   browserName?: string
   'goog:chromeOptions'?: { binary?: string; args?: string[] }
   'moz:firefoxOptions'?: { binary?: string; args?: string[] }
+  'wdio:chromedriverOptions'?: { binary?: string }
+  'wdio:geckodriverOptions'?: { binary?: string }
+  'wdio:edgedriverOptions'?: { binary?: string }
   'wdio:pwOptions'?: PWOptions
 }
+
+/**
+ * Sentinel path written into `wdio:<engine>driverOptions.binary` to short-
+ * circuit WDIO's chromedriver / geckodriver / edgedriver auto-download.
+ *
+ * The check in `@wdio/utils` (`mapCapabilities`, `build/node.js:457`) is a
+ * truthy check — any non-empty string filters the capability out of
+ * `setupDriver`. The value content doesn't matter; nothing actually reads
+ * the binary because our `automationProtocol: 'wdio-pw-driver'` short-
+ * circuits `startWebDriver` entirely. We use a clearly-synthetic path so
+ * the source of the value is obvious if anyone greps for it in logs.
+ */
+const NO_DRIVER_MARKER = '<wdio-pw-driver:no-driver-needed>'
 
 /**
  * Minimal duck-typed interface for the WDIO browser inside `before()`.
@@ -113,6 +129,15 @@ export default class PWService {
       const binary = pw[engine].executablePath()
       writeBinary(caps, engine, binary)
       log.info(`PWService: ${engine} binary → ${binary}`)
+
+      // Skip WDIO's chromedriver / geckodriver / edgedriver auto-download.
+      // We dispatch every command via playwright-core in-process; the
+      // downloaded WebDriver binary is never invoked. Opt out per cap
+      // with wdio:pwOptions.skipDriverDownload = false.
+      const pwOpts = caps['wdio:pwOptions'] ?? {}
+      if (pwOpts.skipDriverDownload !== false) {
+        suppressDriverDownload(caps, engine)
+      }
     }
   }
 
@@ -279,4 +304,29 @@ function writeBinary(caps: CapsRecord, engine: 'chromium' | 'firefox' | 'webkit'
   } else if (engine === 'firefox') {
     caps['moz:firefoxOptions'] = { ...(caps['moz:firefoxOptions'] ?? {}), binary }
   }
+}
+
+/**
+ * Set `wdio:<engine>driverOptions.binary` to a sentinel so WDIO's CLI-level
+ * `setupDriver` filter skips this capability. We always set ALL three
+ * (chromedriver / geckodriver / edgedriver) regardless of which engine the
+ * caller picked — costs nothing, and avoids surprises if a downstream
+ * service rewrites the browserName before driver-setup runs.
+ *
+ * Existing user-provided `binary` values are preserved — we only fill in
+ * the slot when it's empty. A user who provides a real binary path on
+ * purpose (e.g., to run their own chromedriver alongside our driver in
+ * a custom workflow) keeps that path.
+ */
+function suppressDriverDownload(caps: CapsRecord, engine: 'chromium' | 'firefox' | 'webkit'): void {
+  if (!caps['wdio:chromedriverOptions']?.binary) {
+    caps['wdio:chromedriverOptions'] = { ...(caps['wdio:chromedriverOptions'] ?? {}), binary: NO_DRIVER_MARKER }
+  }
+  if (!caps['wdio:geckodriverOptions']?.binary) {
+    caps['wdio:geckodriverOptions'] = { ...(caps['wdio:geckodriverOptions'] ?? {}), binary: NO_DRIVER_MARKER }
+  }
+  if (!caps['wdio:edgedriverOptions']?.binary) {
+    caps['wdio:edgedriverOptions'] = { ...(caps['wdio:edgedriverOptions'] ?? {}), binary: NO_DRIVER_MARKER }
+  }
+  log.info(`PWService: suppressed WebDriver binary downloads for ${engine} (using Playwright instead)`)
 }
