@@ -1,0 +1,82 @@
+name: Release
+
+# Driven by changesets. Push to main flow:
+#
+#  1. A push to main runs this workflow.
+#  2. If there are unconsumed changesets in `.changeset/`, the workflow opens
+#     (or updates) a "Version Packages" PR that bumps the version + writes
+#     CHANGELOG entries.
+#  3. When that PR is merged, this workflow re-runs and publishes the new
+#     version(s) to npm with provenance attestation.
+#
+# One-time repo setup needed (manual):
+#  - npm: create an automation token, add as `NPM_TOKEN` repo secret
+#  - GitHub: Settings → Actions → General → Workflow permissions →
+#            "Read and write" + "Allow GitHub Actions to create and approve PRs"
+
+on:
+  push:
+    branches: [main]
+
+# Pages-style: cancel earlier in-flight runs when a newer commit lands.
+concurrency:
+  group: release
+  cancel-in-progress: false  # don't kill an in-progress publish
+
+permissions:
+  contents: write       # bump version, write CHANGELOG, push tags
+  pull-requests: write  # open the version PR
+  id-token: write       # npm provenance attestation (SLSA)
+
+jobs:
+  release:
+    name: Version + publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so changesets can compute the changelog correctly.
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+          # Required for npm provenance — the publish step needs to know
+          # which registry to attest against.
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      # Sanity check before publishing — caught one rebase mishap already.
+      - name: Test
+        run: pnpm test
+
+      - name: Create release PR or publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          # `pnpm release` runs build + `changeset publish`. Provenance is
+          # enabled via the npm-side flag in the publish args (see below).
+          publish: pnpm release
+          # Title shown on the auto-opened "Version Packages" PR.
+          title: 'chore: release wdio-pw-driver'
+          commit: 'chore: release wdio-pw-driver'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Force npm to attach provenance attestations on publish (SLSA).
+          # changesets/action plumbs unknown env vars to npm publish.
+          NPM_CONFIG_PROVENANCE: 'true'

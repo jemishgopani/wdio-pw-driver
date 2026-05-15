@@ -122,6 +122,32 @@ Full docs: **https://jemishgopani.github.io/wdio-pw-driver/**
 
 Markdown source for the site lives in [`website/docs/`](./website/docs/) and deploys automatically on push to `main` via [`.github/workflows/deploy-docs.yml`](./.github/workflows/deploy-docs.yml).
 
+## Stability and versioning
+
+This driver is pre-1.0. Breaking changes can land in any `0.x.0` release; pin a specific version (`"wdio-pw-driver": "0.1.0"`) if you need stability between updates.
+
+**What counts as a breaking change** (any of):
+
+- Removal or rename of a published export (`PWDriver`, `PWService`, `installPerTestHooks`, an error class, etc.).
+- Change to the wire shape of a protocol command handler's response.
+- Change to the `wdio:pwOptions` capability schema that requires existing test code to adapt.
+- Drop of support for a Node version older versions of the driver supported.
+- Bumping the minimum `playwright-core` peer-dependency major.
+
+**What does NOT count as breaking** (will land in patch / minor releases):
+
+- New `pw*` extension commands.
+- New `wdio:pwOptions` fields.
+- Internal refactors that don't change command shapes or option semantics.
+- Bug fixes that align our behavior closer to W3C / chromedriver semantics, even if a test was previously passing because of a divergence.
+
+**Support policy**:
+
+- **Pre-1.0 (now)**: only the latest published version receives fixes. No back-porting.
+- **Post-1.0**: latest two minor versions of the current major; previous major gets security fixes for 6 months after the new major ships.
+
+Migration notes for any breaking change are in [CHANGELOG.md](./CHANGELOG.md). Breaking changes are also tagged with a `BREAKING CHANGE:` footer in the commit message.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).

@@ -1,0 +1,8 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "wdio-pw-driver": "0.1.0-alpha.0"
+  },
+  "changesets": []
+}

@@ -202,13 +202,20 @@ export const DEFAULT_TIMEOUT_MS = 30_000
  * timeout=0 as "wait forever"), so we use a small positive value as the
  * effective floor.
  *
- * Why this matters: a larger implicit wait silently collapses fine-grained
- * polling done by helpers like `waitForDisplayed` (default 500 ms interval)
- * into one find per implicit period. With the previous 5000 ms default, a
- * 15 s `waitForDisplayed` only got 3–4 polls — enough to miss brief UI
- * states such as Material snackbars (~4 s lifetime) entirely.
+ * **500 ms** is the floor — large enough to absorb IPC overhead and event-loop
+ * jitter on slow CI hardware (macOS GitHub runners can stall 200-300 ms during
+ * a cold worker spin-up), small enough that fine-grained polling done by
+ * helpers like `waitForDisplayed` (default 100-500 ms interval) still gets
+ * meaningful tick density within a typical wait budget. The previous 100 ms
+ * value flaked on macOS Node 20 — Playwright's `locator.waitFor` IPC alone
+ * can take 80-90 ms before the polling check itself runs.
  *
- * Tests that genuinely need an implicit wait should set it explicitly via
- * `browser.setTimeouts({ implicit: <ms> })` or `wdio:pwOptions.timeout`.
+ * Historical context: the old default was 5000 ms which collapsed
+ * `waitForDisplayed`-style polling into one find per implicit period, so
+ * brief UI states such as Material snackbars (~4 s lifetime) could slip
+ * through unobserved.
+ *
+ * Tests that genuinely need a longer implicit wait should set it explicitly
+ * via `browser.setTimeouts({ implicit: <ms> })` or `wdio:pwOptions.timeout`.
  */
-export const DEFAULT_IMPLICIT_TIMEOUT_MS = 100
+export const DEFAULT_IMPLICIT_TIMEOUT_MS = 500

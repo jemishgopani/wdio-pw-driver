@@ -1,0 +1,59 @@
+# Dependabot keeps the driver's npm deps and the CI workflow actions
+# patched. We split into two ecosystems so the action-version updates
+# don't get lost in a flood of npm bumps.
+#
+# Schedule: weekly. Daily would be too noisy for a small project; monthly
+# would let known CVEs sit too long. Weekly with grouping keeps the PR
+# count manageable.
+version: 2
+updates:
+  # npm — the driver's runtime + dev deps + the website's deps.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      # Bundle non-breaking minor/patch updates into one PR per group so
+      # we don't drown in dozens of single-package PRs.
+      dev-dependencies-minor:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      runtime-dependencies-patch:
+        dependency-type: production
+        update-types:
+          - patch
+    ignore:
+      # `playwright-core` is a peer dep — deliberately don't auto-bump it.
+      # Users pin their own version; bumping ours could surprise them.
+      - dependency-name: playwright-core
+      # Major @wdio/* bumps need manual review (often have breaking
+      # protocol shape changes that affect our integration tests).
+      - dependency-name: "@wdio/*"
+        update-types: [version-update:semver-major]
+
+  # The Docusaurus site has its own pnpm workspace.
+  - package-ecosystem: npm
+    directory: /website
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      docusaurus-and-react:
+        patterns:
+          - "@docusaurus/*"
+          - react
+          - react-dom
+          - "@mdx-js/*"
+
+  # GitHub Actions versions in our workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
