@@ -30,7 +30,7 @@ jobs:
       # pnpm before setup-node so setup-node's cache-key resolves the right
       # lockfile-checksum. Order matters — flip these two and the cache misses.
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
@@ -113,7 +113,7 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
       - uses: actions/setup-node@v4
