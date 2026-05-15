@@ -57,6 +57,27 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
+      # Cache + install Playwright Chromium so the integration tests can
+      # actually launch a browser. CI workflow does the same dance for
+      # the same reason.
+      - name: Resolve playwright-core version
+        id: pw-version
+        shell: bash
+        run: |
+          v=$(node -p "require('playwright-core/package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Chromium
+        run: node ./bin/wdio-pw.js install chromium
+
       - name: Build
         run: pnpm build
 
