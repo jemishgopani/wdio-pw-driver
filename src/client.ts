@@ -192,6 +192,9 @@ export function buildExtensionsPrototype(registry: CommandRegistry): PropertyDes
     'pwWaitForResponse',
     'pwOnFileChooser',
     'pwAriaSnapshot',
+    // Auto-wait override backbone — internal-only, consumed by PWService
+    'pwClickElement',
+    'pwWaitElementFor',
   ]
   for (const name of extensionCommands) {
     const handler = registry[name]

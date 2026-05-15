@@ -117,6 +117,30 @@ export interface PWOptions {
   strictSelectors?: boolean
 
   /**
+   * Whether `PWService` should transparently override a small set of WDIO
+   * commands (`click`, `waitForExist`, `waitForDisplayed`) so they use
+   * Playwright's in-page actionability primitives instead of WDIO's
+   * protocol-roundtrip polling.
+   *
+   * Default: `true`. With overrides on:
+   *
+   *  - `click(opts)` accepts Playwright's full option surface
+   *    (`force`, `trial`, `position`, `timeout`, `button`, `modifiers`,
+   *    `clickCount`, `delay`, `noWaitAfter`) in addition to WDIO's
+   *    native options.
+   *  - `waitForExist` / `waitForDisplayed` route through
+   *    `locator.waitFor({state})` for in-page polling (faster, no
+   *    per-poll HTTP round trip) and stricter visibility checks
+   *    (handles `content-visibility`, `aria-hidden`, animated layouts).
+   *
+   * Set to `false` if a test relied on chromedriver's looser actionability
+   * (e.g. an `aria-disabled` element that the test used to be able to click
+   * but Playwright now correctly rejects). WDIO's native poll + your existing
+   * test code then run unmodified.
+   */
+  strictActionability?: boolean
+
+  /**
    * Service worker policy for the BrowserContext.
    *  - `"allow"` (default): registered service workers run normally.
    *  - `"block"`: registration silently fails — useful when SW caching is

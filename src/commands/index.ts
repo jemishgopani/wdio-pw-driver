@@ -30,6 +30,7 @@ import {
   findElementsFromShadowRoot,
   getActiveElement,
   elementClick,
+  pwClickElement,
   elementClear,
   elementSendKeys,
   getElementText,
@@ -107,6 +108,7 @@ import { takeScreenshot, takeElementScreenshot } from './screenshot.js'
 import { pwWaitForRequest, pwWaitForResponse } from './network.js'
 import { pwOnFileChooser } from './filechooser.js'
 import { pwAriaSnapshot } from './aria.js'
+import { pwWaitElementFor } from './wait.js'
 
 export const registry: CommandRegistry = {
   // session
@@ -135,6 +137,7 @@ export const registry: CommandRegistry = {
   getActiveElement,
   // element — actions + queries
   elementClick,
+  pwClickElement,
   elementClear,
   elementSendKeys,
   getElementText,
@@ -249,6 +252,9 @@ export const registry: CommandRegistry = {
   pwWaitForResponse,
   pwOnFileChooser,
   pwAriaSnapshot,
+
+  // pw-specific extension commands (auto-wait override backbone, 2026-05-15)
+  pwWaitElementFor,
 }
 
 /**

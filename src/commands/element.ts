@@ -443,6 +443,61 @@ export const elementClick: CommandHandler = async (ctx, elementId) => {
 }
 
 /**
+ * Internal protocol command — option-accepting click. `elementClick` (the
+ * W3C handler above) takes no options, but PWService overrides WDIO's
+ * `click()` to route here so users can pass Playwright power options
+ * (`force`, `trial`, `position`, `timeout`, `button`, `modifiers`,
+ * `clickCount`, `delay`, `noWaitAfter`) without falling back to
+ * `pwLocator` extensions.
+ *
+ * Honors the same `<option>` special-case as `elementClick`: if the
+ * target is an `<option>`, routes through the parent `<select>`'s
+ * `selectOption()` instead of trying to click directly (which Playwright
+ * rejects). The special-case is skipped under `force: true` since the
+ * user is explicitly asking to bypass actionability.
+ */
+interface PwClickOpts {
+  button?: 'left' | 'middle' | 'right'
+  clickCount?: number
+  delay?: number
+  force?: boolean
+  modifiers?: Array<'Alt' | 'Control' | 'ControlOrMeta' | 'Meta' | 'Shift'>
+  noWaitAfter?: boolean
+  position?: { x: number; y: number }
+  timeout?: number
+  trial?: boolean
+}
+
+export const pwClickElement: CommandHandler = async (ctx, elementId, opts) => {
+  const loc = locatorFor(ctx, elementId)
+  const o = (opts ?? {}) as PwClickOpts
+  const timeout = typeof o.timeout === 'number' ? o.timeout : ctx.session.defaultTimeout
+  await onStoredElement(async () => {
+    if (!o.force) {
+      const tag = await loc.evaluate((el) => (el as HTMLElement).tagName).catch(() => '')
+      if (tag === 'OPTION') {
+        const value = await loc.evaluate((el) => (el as HTMLOptionElement).value)
+        const parentSelect = loc.locator('xpath=ancestor::select[1]')
+        await parentSelect.selectOption({ value }, { timeout })
+        return
+      }
+    }
+    await loc.click({
+      button: o.button,
+      clickCount: o.clickCount,
+      delay: o.delay,
+      force: o.force,
+      modifiers: o.modifiers,
+      noWaitAfter: o.noWaitAfter,
+      position: o.position,
+      timeout,
+      trial: o.trial,
+    })
+  })
+  return null
+}
+
+/**
  * POST /session/:sessionId/element/:elementId/clear
  *
  * Playwright's `.clear()` only works on input/textarea/contenteditable;
