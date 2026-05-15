@@ -175,6 +175,9 @@ export const findElementFromElement: CommandHandler = async (ctx, parentId, usin
   if (typeof using !== 'string' || typeof value !== 'string') {
     throw new TypeError('findElementFromElement requires (using, value) as strings')
   }
+  if (using === 'css selector') {
+    return findChildElementViaQuerySelector(ctx, parent, value)
+  }
   const child = buildLocator(parent, using, value).first()
   return findOrNotFoundShape(ctx, child, `${using}=${value} (under stored element)`)
 }
@@ -187,6 +190,9 @@ export const findElementsFromElement: CommandHandler = async (ctx, parentId, usi
   if (typeof using !== 'string' || typeof value !== 'string') {
     throw new TypeError('findElementsFromElement requires (using, value) as strings')
   }
+  if (using === 'css selector') {
+    return findChildElementsViaQuerySelector(ctx, parent, value)
+  }
   const root = buildLocator(parent, using, value)
   const count = await root.count()
   const refs: ElementReference[] = []
@@ -194,6 +200,111 @@ export const findElementsFromElement: CommandHandler = async (ctx, parentId, usi
     refs.push(asElementReference(ctx.session.elementStore.register(root.nth(i))))
   }
   return refs
+}
+
+/**
+ * W3C-compatible findElementFromElement for CSS selectors.
+ *
+ * Playwright's `parent.locator(child)` uses `:scope` chaining — the child
+ * selector is evaluated with `:scope` set to parent, but ":scope" itself is
+ * never included as a candidate match for the leftmost simple selector.
+ * That diverges from `Element.querySelector()` (W3C Selectors API), which is
+ * what chromedriver / Selenium use: it matches descendants where any ancestor
+ * up to AND INCLUDING the parent can satisfy the descendant combinator.
+ *
+ * Concrete case that breaks under PW's chaining but works under chromedriver:
+ *   parent  = <div data-testid="X">…<label class="mdc-label">…</label></div>
+ *   child   = '[data-testid="X"] label.mdc-label'
+ * → PW's locator can't find the label because there's no `[data-testid="X"]`
+ *   STRICTLY inside parent. querySelector finds it because parent itself
+ *   matches the leftmost simple selector.
+ *
+ * We dispatch through `parent.evaluateHandle(el => el.querySelector(sel))`
+ * to get exactly the W3C semantics, then register the returned ElementHandle
+ * as a locator via a unique marker attribute (same trick used by
+ * registerHandle in execute.ts and getActiveElement).
+ */
+async function findChildElementViaQuerySelector(
+  ctx: CommandContext,
+  parent: Locator,
+  selector: string,
+): Promise<ElementReference | { error: string; message: string }> {
+  const deadline = Date.now() + ctx.session.implicitTimeout
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      const handle = await parent.evaluateHandle(
+        (el: Element, sel: string) => el.querySelector(sel),
+        selector,
+      )
+      try {
+        const asEl = handle.asElement()
+        if (asEl) {
+          const id = await registerHandleAsLocator(ctx, asEl)
+          return asElementReference(id)
+        }
+      } finally {
+        await handle.dispose().catch(() => {})
+      }
+    } catch (err) {
+      if ((err as { name?: string }).name !== 'TimeoutError') throw err
+    }
+    if (Date.now() >= deadline) {
+      return {
+        error: 'no such element',
+        message: `Element not found: css selector=${selector} (under stored element)`,
+      }
+    }
+    await new Promise((r) => setTimeout(r, 50))
+  }
+}
+
+async function findChildElementsViaQuerySelector(
+  ctx: CommandContext,
+  parent: Locator,
+  selector: string,
+): Promise<ElementReference[]> {
+  // findElements semantics: no implicit-wait poll; return immediately with
+  // whatever's currently in the DOM (per W3C — only findElement waits).
+  const handles = await parent.evaluateHandle(
+    (el: Element, sel: string) => Array.from(el.querySelectorAll(sel)),
+    selector,
+  )
+  try {
+    const length = await handles.evaluate((arr) => (arr as unknown[]).length)
+    const refs: ElementReference[] = []
+    for (let i = 0; i < length; i++) {
+      const itemHandle = await handles.evaluateHandle(
+        (arr: unknown[], idx: number) => (arr as unknown[])[idx],
+        i,
+      )
+      try {
+        const asEl = itemHandle.asElement()
+        if (asEl) {
+          const id = await registerHandleAsLocator(ctx, asEl)
+          refs.push(asElementReference(id))
+        }
+      } finally {
+        await itemHandle.dispose().catch(() => {})
+      }
+    }
+    return refs
+  } finally {
+    await handles.dispose().catch(() => {})
+  }
+}
+
+async function registerHandleAsLocator(
+  ctx: CommandContext,
+  el: { evaluate: (fn: (n: Element) => string) => Promise<string> },
+): Promise<string> {
+  const marker = await el.evaluate((node: Element) => {
+    const name = `data-pw-find-${Math.random().toString(36).slice(2)}`
+    node.setAttribute(name, '1')
+    return name
+  })
+  const loc = currentScope(ctx.session).locator(`[${marker}]`).first()
+  return ctx.session.elementStore.register(loc)
 }
 
 /* -------------------------------------------------------------------------- */
@@ -449,10 +560,44 @@ export const getElementProperty: CommandHandler = async (ctx, elementId, name) =
  *
  * Per W3C, isDisplayed should NOT throw on a detached element — it returns
  * false. We skip the freshness check here for that reason.
+ *
+ * Implementation mirrors Selenium's "is displayed" atom rather than
+ * Playwright's `locator.isVisible()`. The key difference: Playwright treats
+ * any element with an empty bounding box as not visible, whereas Selenium /
+ * chromedriver consider an element displayed if it (or a descendant) is
+ * rendered. Some Material components (e.g. mdc-label with display:contents,
+ * snackbar containers mid-animation) hit the Playwright path but pass the
+ * W3C one — relying on isVisible breaks tests that worked under chromedriver.
  */
 export const isElementDisplayed: CommandHandler = async (ctx, elementId) => {
   const loc = locatorFor(ctx, elementId)
-  return loc.isVisible()
+  if ((await loc.count()) === 0) return false
+  return loc.first().evaluate((el: Element): boolean => {
+    let cur: Element | null = el
+    while (cur) {
+      const s = getComputedStyle(cur)
+      if (s.display === 'none') return false
+      if (s.visibility === 'hidden' || s.visibility === 'collapse') return false
+      cur = cur.parentElement
+    }
+    const hasRect = (rs: DOMRectList): boolean => {
+      for (let i = 0; i < rs.length; i++) {
+        const r = rs.item(i)
+        if (r && (r.width > 0 || r.height > 0)) return true
+      }
+      return false
+    }
+    if (hasRect((el as HTMLElement).getClientRects())) return true
+    // Element has no rects of its own (display:contents, empty inline). Walk
+    // descendants — if any child renders, parent is considered displayed.
+    const queue: Element[] = Array.from(el.children)
+    while (queue.length) {
+      const c = queue.shift() as Element
+      if (hasRect(c.getClientRects())) return true
+      for (const child of Array.from(c.children)) queue.push(child)
+    }
+    return false
+  })
 }
 
 /**

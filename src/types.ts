@@ -85,6 +85,15 @@ export interface PWOptions {
   device?: string
 
   /**
+   * Page viewport size. Playwright's BrowserContext default is 1280×720 — this
+   * lets callers override it (e.g. to 1920×1080 to match chromedriver
+   * `--window-size=1920,1080`). If `goog:chromeOptions.args` contains
+   * `--window-size=W,H` and no explicit viewport is set, the driver parses
+   * those dimensions as a fallback so existing chromedriver configs port over.
+   */
+  viewport?: { width: number; height: number }
+
+  /**
    * Start the BrowserContext in offline mode — every navigation and fetch
    * fails as if the network is down. Toggle later with
    * `browser.pwSetOffline(true|false)`. Useful for testing offline

@@ -99,6 +99,31 @@ export function toContextOptions(caps: PWCapabilities): BrowserContextOptions {
     opts.viewport = { width: mobileMetrics.width, height: mobileMetrics.height }
   }
 
+  // 2a. Explicit viewport in wdio:pwOptions wins over device preset / mobile
+  //     emulation. This is the main way to match chromedriver's 1920×1080
+  //     window without setting up a device preset.
+  if (pw?.viewport?.width && pw?.viewport?.height) {
+    opts.viewport = { width: pw.viewport.width, height: pw.viewport.height }
+  }
+
+  // 2b. Fallback: if no viewport has been set yet, parse --window-size=W,H
+  //     from goog:chromeOptions.args. Lets existing chromedriver configs
+  //     port over without editing capabilities.
+  if (!opts.viewport) {
+    const chromeArgs = (
+      (caps as Record<string, unknown>)['goog:chromeOptions'] as
+        | { args?: string[] }
+        | undefined
+    )?.args
+    const sizeArg = chromeArgs?.find((a) => a.startsWith('--window-size='))
+    if (sizeArg) {
+      const m = sizeArg.match(/^--window-size=(\d+)\s*,\s*(\d+)$/)
+      if (m) {
+        opts.viewport = { width: Number(m[1]), height: Number(m[2]) }
+      }
+    }
+  }
+
   // 3. Restore previously-saved cookies + localStorage. Playwright accepts
   //    either an absolute file path string or a parsed StorageState object.
   //    We pass the string so Playwright reads + parses, matching the public
@@ -172,10 +197,18 @@ export const DEFAULT_TIMEOUT_MS = 30_000
 /**
  * Default implicit-wait for find* commands.
  *
- * W3C strict default is 0, but in practice every real driver implementation
- * (chromedriver, geckodriver, safaridriver) and every test author bumps this
- * to 5–10s because modern SPAs (Vue/React/Angular) need time to mount
- * components after first paint. We match the practical default; users who
- * want strict W3C semantics can `setTimeouts({implicit: 0})`.
+ * W3C strict default is 0, and chromedriver / geckodriver / safaridriver all
+ * ship this default. We can't pass 0 through to Playwright (which interprets
+ * timeout=0 as "wait forever"), so we use a small positive value as the
+ * effective floor.
+ *
+ * Why this matters: a larger implicit wait silently collapses fine-grained
+ * polling done by helpers like `waitForDisplayed` (default 500 ms interval)
+ * into one find per implicit period. With the previous 5000 ms default, a
+ * 15 s `waitForDisplayed` only got 3–4 polls — enough to miss brief UI
+ * states such as Material snackbars (~4 s lifetime) entirely.
+ *
+ * Tests that genuinely need an implicit wait should set it explicitly via
+ * `browser.setTimeouts({ implicit: <ms> })` or `wdio:pwOptions.timeout`.
  */
-export const DEFAULT_IMPLICIT_TIMEOUT_MS = 5_000
+export const DEFAULT_IMPLICIT_TIMEOUT_MS = 100
