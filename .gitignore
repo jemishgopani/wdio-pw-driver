@@ -2,6 +2,7 @@ node_modules/
 build/
 coverage/
 traces/
+bench/results/
 *.log
 *.tgz
 .DS_Store

@@ -3,7 +3,7 @@ import tsparser from '@typescript-eslint/parser'
 
 export default [
   {
-    files: ['src/**/*.ts', 'tests/**/*.ts'],
+    files: ['src/**/*.ts', 'tests/**/*.ts', 'bench/**/*.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -21,6 +21,13 @@ export default [
     },
   },
   {
-    ignores: ['build/', 'node_modules/', 'coverage/'],
+    // Bench scripts are CLI tools — console output IS the product.
+    files: ['bench/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
+    ignores: ['build/', 'node_modules/', 'coverage/', 'bench/results/'],
   },
 ]

@@ -113,3 +113,71 @@ A 36% drop in wall-clock time on a real suite compounds:
 - **Iteration**: faster local runs make developers more likely to run the full suite before pushing, catching regressions earlier
 
 The trade-off: pw-driver is a faster execution surface, which sometimes exposes **pre-existing test races** that chromedriver's natural latency hid. Those are real bugs in the test code, not driver bugs — see [Troubleshooting](./troubleshooting) for the common patterns and fixes.
+
+---
+
+## Continuous regression tracking
+
+The headline numbers above are a one-shot snapshot — useful as marketing
+but useless for catching "did our latest change make `findElement` 30%
+slower?"
+
+For that we run a **separate micro-benchmark suite** nightly. It's
+focused on the driver's own overhead (not page or network time):
+
+| Scenario | Iterations | What it measures |
+|---|---:|---|
+| `sessionLifecycle` | 5 | newSession + deleteSession (cold start) |
+| `navigateTo` | 30 | page.goto + waitFor domcontentloaded |
+| `findElement` | 50 | single CSS find |
+| `findElements x100` | 20 | bulk locator allocation |
+| `elementClick` | 50 | full actionability cycle |
+| `executeScript` | 50 | JS round-trip overhead |
+| `composite` | 15 | realistic 4-command sequence |
+
+All scenarios use `data:` URLs to eliminate network variance.
+
+### How it works
+
+`.github/workflows/bench-nightly.yml` runs the suite at 04:00 UTC. Each
+run:
+
+1. Downloads the previous run's `latest.json` as an artifact (the
+   "baseline").
+2. Runs `pnpm bench`, producing a fresh `latest.json` plus a
+   timestamped copy.
+3. Runs `pnpm bench:compare baseline.json latest.json`, which prints a
+   markdown table of per-scenario p50/p95/mean deltas to the GitHub Step
+   Summary.
+4. Fails the job if any scenario's **p95 regressed by more than 20%**.
+5. Uploads the new `latest.json` as the next run's baseline.
+
+PRs that touch `src/` or `bench/` also trigger the workflow, so a
+performance-affecting change is flagged before merge.
+
+### Run locally
+
+```bash
+pnpm bench                                              # all scenarios
+pnpm bench --only findElement,elementClick              # subset
+pnpm bench:compare bench/results/latest.json bench/results/latest.json   # compare two runs
+```
+
+### Sample p95 numbers (mac arm64, headless Chromium, May 2026)
+
+| Scenario | p95 |
+|---|---:|
+| `sessionLifecycle` | ~150 ms |
+| `navigateTo` (data:) | ~3 ms |
+| `findElement` | ~1 ms |
+| `findElements x100` | ~1 ms |
+| `elementClick` | ~22 ms |
+| `executeScript` | ~1 ms |
+| `composite` | ~40 ms |
+
+These are **driver overhead**, not page or network time. The p95 of a
+real `await $('#submit').click()` against a real page will be dominated
+by page-load and animation time — what we track here is what the driver
+adds on top of that.
+
+See `bench/README.md` for methodology details and how to add a scenario.

@@ -42,7 +42,9 @@
     "clean": "rimraf build",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && changeset publish",
+    "bench": "WDIO_LOG_LEVEL=silent tsx bench/runner.ts",
+    "bench:compare": "tsx bench/compare.ts"
   },
   "engines": {
     "node": ">=18.20.0"
@@ -95,6 +97,7 @@
     "playwright-core": "^1.40.0",
     "rimraf": "^6.0.0",
     "tsup": "^8.0.0",
+    "tsx": "^4.22.0",
     "typescript": "^5.4.0",
     "vitest": "^3.0.0",
     "webdriverio": "^9.0.0"

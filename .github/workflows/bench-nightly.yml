@@ -1,0 +1,116 @@
+name: Benchmarks (nightly)
+
+# Continuous performance regression detection.
+#
+# Runs the bench/runner.ts micro + composite scenarios, downloads the
+# previous nightly's results as an artifact, computes per-scenario p95
+# deltas, and fails the job on any regression > 20% (configured in
+# bench/compare.ts).
+#
+# Trigger:
+#   - nightly cron at 04:00 UTC
+#   - on PR change to bench/, src/, or this workflow
+#   - manual via workflow_dispatch
+#
+# The job runs on a single fixed runner type (ubuntu-latest, Node 22) so
+# numbers are comparable run-to-run. Mixing OS or Node version would add
+# variance that swamps real driver changes.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'bench/**'
+      - 'src/**'
+      - '.github/workflows/bench-nightly.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read     # to download the previous run's artifact
+
+jobs:
+  bench:
+    name: Run + compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve playwright-core version
+        id: pw-version
+        shell: bash
+        run: |
+          v=$(node -p "require('playwright-core/package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+          key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Chromium
+        run: node ./bin/wdio-pw.js install chromium
+
+      - name: Build
+        run: pnpm build
+
+      # Try to fetch the previous baseline. The first run on a branch
+      # has nothing to compare against — bench/compare.ts handles that
+      # gracefully (passes with a "no baseline" message).
+      - name: Download previous baseline
+        id: download
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: bench-nightly.yml
+          name: bench-results
+          path: bench/baseline
+          # Pull from the most recent successful run on main.
+          branch: main
+          workflow_conclusion: success
+
+      - name: Run benchmarks
+        run: pnpm bench
+
+      - name: Compare against baseline
+        run: |
+          if [ -f bench/baseline/latest.json ]; then
+            pnpm bench:compare bench/baseline/latest.json bench/results/latest.json
+          else
+            echo "No baseline available — skipping comparison"
+            pnpm bench:compare /tmp/nonexistent.json bench/results/latest.json
+          fi
+
+      - name: Upload current run as next baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: bench/results/
+          retention-days: 90
