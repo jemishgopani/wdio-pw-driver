@@ -20,6 +20,9 @@
   },
   "include": [
     "wdio.conf.ts",
+    "wdio.shared.ts",
+    "wdio.firefox.conf.ts",
+    "wdio.webkit.conf.ts",
     "test/**/*",
     "globals.d.ts"
   ]

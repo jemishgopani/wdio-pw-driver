@@ -37,16 +37,30 @@ permissions:
 
 jobs:
   example:
-    name: ${{ matrix.example }} example (Node ${{ matrix.node }} on ${{ matrix.os }})
+    name: ${{ matrix.example }}/${{ matrix.engine }} (Node ${{ matrix.node }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     continue-on-error: true
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
+      # Default matrix: each example gets a chromium run. The `include`
+      # block adds firefox + webkit runs for saucedemo only — the minimal
+      # example is a one-spec hello-world and doesn't need engine
+      # coverage.
       matrix:
         example: [minimal, saucedemo]
+        engine: [chromium]
         os: [ubuntu-latest]
         node: [22]
+        include:
+          - example: saucedemo
+            engine: firefox
+            os: ubuntu-latest
+            node: 22
+          - example: saucedemo
+            engine: webkit
+            os: ubuntu-latest
+            node: 22
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -96,15 +110,31 @@ jobs:
           path: |
             ~/.cache/ms-playwright
             ~/Library/Caches/ms-playwright
-          key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+          # Single shared cache across engines for the same pw-version —
+          # Playwright stores all engines under the same cacheDir, so the
+          # firefox cache builds on chromium's, etc.
+          key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}-multi
 
-      - name: Install Chromium for example
+      - name: Install browser binary for example
         working-directory: examples/${{ matrix.example }}
-        run: node node_modules/playwright-core/cli.js install chromium
+        run: node node_modules/playwright-core/cli.js install ${{ matrix.engine }}
 
-      - name: Run SauceDemo suite
+      # WebKit on Linux pulls in extra system deps (libwoff1,
+      # gstreamer, libsecret, etc.). Firefox + Chromium need much less.
+      # `install-deps` is a no-op for already-installed deps.
+      - name: Install system deps for ${{ matrix.engine }}
+        if: matrix.engine == 'webkit' && runner.os == 'Linux'
         working-directory: examples/${{ matrix.example }}
-        run: pnpm test
+        run: node node_modules/playwright-core/cli.js install-deps ${{ matrix.engine }}
+
+      - name: Run example suite
+        working-directory: examples/${{ matrix.example }}
+        run: |
+          if [ "${{ matrix.engine }}" = "chromium" ]; then
+            pnpm test
+          else
+            pnpm test:${{ matrix.engine }}
+          fi
         env:
           HEADLESS: 'true'
 
@@ -113,7 +143,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.example }}-failure-${{ runner.os }}-node${{ matrix.node }}
+          name: ${{ matrix.example }}-${{ matrix.engine }}-failure-${{ runner.os }}-node${{ matrix.node }}
           path: |
             examples/${{ matrix.example }}/traces/
             examples/${{ matrix.example }}/videos/

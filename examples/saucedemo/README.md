@@ -9,12 +9,33 @@ SauceDemo site at https://www.saucedemo.com.
 ```bash
 pnpm install
 node node_modules/playwright-core/cli.js install chromium    # one-time
-pnpm test                            # headless
+pnpm test                            # headless chromium (~25s)
 HEADLESS=false pnpm test             # headed, for debugging
+
+# Cross-engine — install the binary once, then run the matching config
+node node_modules/playwright-core/cli.js install firefox
+pnpm test:firefox                    # ~26s
+
+node node_modules/playwright-core/cli.js install webkit
+pnpm test:webkit                     # ~34s
+
+pnpm test:all-engines                # all three sequentially
 ```
 
 `pnpm test` runs all 4 spec files (login, inventory sort, cart + checkout,
 side menu) in sequence — about 25 seconds total against a warm cache.
+
+## Configs
+
+| File | Engine | Notes |
+|---|---|---|
+| `wdio.conf.ts` | chromium (default) | thin wrapper around `wdio.shared.ts` |
+| `wdio.firefox.conf.ts` | firefox | ditto |
+| `wdio.webkit.conf.ts` | webkit | ditto |
+| `wdio.shared.ts` | (base) | the actual config — engine is the only knob |
+
+Per-engine traces and videos go to `./traces/<engine>/` and
+`./videos/<engine>/` so parallel runs don't clobber each other.
 
 ## Structure
 
