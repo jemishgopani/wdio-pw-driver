@@ -19,7 +19,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Guides',
       collapsed: false,
-      items: ['isolation', 'reporting'],
+      items: ['isolation', 'reporting', 'benchmarks'],
     },
     {
       type: 'category',
