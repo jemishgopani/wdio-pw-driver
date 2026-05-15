@@ -36,14 +36,15 @@ permissions:
   contents: read
 
 jobs:
-  saucedemo:
-    name: SauceDemo example (Node ${{ matrix.node }} on ${{ matrix.os }})
+  example:
+    name: ${{ matrix.example }} example (Node ${{ matrix.node }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     continue-on-error: true
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
+        example: [minimal, saucedemo]
         os: [ubuntu-latest]
         node: [22]
     steps:
@@ -62,7 +63,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: |
             pnpm-lock.yaml
-            examples/saucedemo/pnpm-lock.yaml
+            examples/${{ matrix.example }}/pnpm-lock.yaml
 
       # Build + pack the driver first so the example's `file:../..` dep
       # picks up our latest changes (rather than whatever was published).
@@ -75,7 +76,7 @@ jobs:
       # Now install the example's deps. The `file:../..` reference will
       # resolve to the freshly-built driver in this checkout.
       - name: Install example deps
-        working-directory: examples/saucedemo
+        working-directory: examples/${{ matrix.example }}
         run: pnpm install --no-frozen-lockfile
 
       # Cache + install Playwright Chromium for the example's pinned
@@ -83,7 +84,7 @@ jobs:
       # pinned version — examples use ^1.40 to demonstrate users can pin).
       - name: Resolve example's playwright-core version
         id: pw-version
-        working-directory: examples/saucedemo
+        working-directory: examples/${{ matrix.example }}
         shell: bash
         run: |
           v=$(node -p "require('playwright-core/package.json').version")
@@ -98,11 +99,11 @@ jobs:
           key: pw-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Chromium for example
-        working-directory: examples/saucedemo
+        working-directory: examples/${{ matrix.example }}
         run: node node_modules/playwright-core/cli.js install chromium
 
       - name: Run SauceDemo suite
-        working-directory: examples/saucedemo
+        working-directory: examples/${{ matrix.example }}
         run: pnpm test
         env:
           HEADLESS: 'true'
@@ -112,8 +113,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: saucedemo-failure-${{ runner.os }}-node${{ matrix.node }}
+          name: ${{ matrix.example }}-failure-${{ runner.os }}-node${{ matrix.node }}
           path: |
-            examples/saucedemo/traces/
-            examples/saucedemo/videos/
+            examples/${{ matrix.example }}/traces/
+            examples/${{ matrix.example }}/videos/
+          # missing-files OK — minimal example doesn't write traces/videos
+          if-no-files-found: ignore
           retention-days: 7

@@ -3,9 +3,10 @@
 Reference projects that use `wdio-pw-driver` against real public sites.
 Each example is a standalone WebdriverIO project — clone, install, run.
 
-| Example | Target | What it covers |
-|---|---|---|
-| [`saucedemo/`](./saucedemo/) | https://www.saucedemo.com | Login (5 user types) + inventory sort (4 axes) + cart + checkout + side menu. ~25 specs. |
+| Example | Tier | Target | What it covers |
+|---|---|---|---|
+| [`minimal/`](./minimal/) | hello-world | https://example.com | 5 files, one spec, one assertion. The smallest viable wiring of the driver. |
+| [`saucedemo/`](./saucedemo/) | full | https://www.saucedemo.com | Login (5 user types) + inventory sort (4 axes) + cart + checkout + side menu. ~25 specs. |
 
 ## Why these exist
 

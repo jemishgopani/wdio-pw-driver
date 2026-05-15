@@ -14,11 +14,17 @@ so they double as a regression-finding mechanism.
 
 ## Available examples
 
-| Example | Target | What it covers |
-|---|---|---|
-| [`saucedemo/`](https://github.com/jemishgopani/wdio-pw-driver/tree/main/examples/saucedemo) | https://www.saucedemo.com | Login (5 user types) + inventory sort (4 axes) + cart + checkout + side menu. ~25 specs. |
+| Example | Tier | Target | What it covers |
+|---|---|---|---|
+| [`minimal/`](https://github.com/jemishgopani/wdio-pw-driver/tree/main/examples/minimal) | hello-world | https://example.com | 5 files, one spec — the smallest viable driver wiring |
+| [`saucedemo/`](https://github.com/jemishgopani/wdio-pw-driver/tree/main/examples/saucedemo) | full | https://www.saucedemo.com | Page objects + fixtures + ~25 specs (login / sort / cart / checkout / menu) |
 
 More targets coming — OrangeHRM and demowebshop are next.
+
+**Adoption path**: start with `minimal/` to verify the driver wires up
+in your environment. Once that passes, copy the structure of `saucedemo/`
+(page-object pattern + fixtures + capability-driven tracing) into your
+own repo as the foundation.
 
 ## Running the SauceDemo example
 
