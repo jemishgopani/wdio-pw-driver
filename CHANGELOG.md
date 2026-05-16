@@ -1,10 +1,60 @@
 # Changelog
 
+## 0.1.0-beta.1
+
+### Minor Changes
+
+- c4cbb89: First public release as `0.1.0-beta.0`. Pre-1.0 — APIs may change.
+
+  This release rolls up everything shipped so far:
+
+  **Core**
+
+  - `PWDriver.newSession()` plus the full set of W3C Classic + WebDriver BiDi
+    command handlers needed to power a WebdriverIO 9 session through
+    `playwright-core` (no chromedriver, no HTTP).
+  - `PWService` — WDIO launcher service that injects Playwright's bundled
+    browser binaries into capabilities (replacing WDIO's auto-download)
+    and overrides `click` / `waitForExist` / `waitForDisplayed` to use
+    Playwright's actionability primitives.
+  - Suppresses redundant chromedriver / geckodriver / edgedriver downloads —
+    ~10 MB saved per cold-cache CI run. Escape hatch:
+    `wdio:pwOptions.skipDriverDownload: false`.
+
+  **Playwright extensions**
+
+  - Tracing: `pwStartTrace`, `pwStopTrace` plus capability-driven auto-trace.
+  - Storage: `pwSaveStorage`, `pwLoadStorage`, `wdio:pwOptions.storageState`.
+  - Network mocking: `pwRoute`, `pwUnroute`, `pwRouteFromHAR`.
+  - Context lifecycle: `pwNewContext`, `pwSwitchDevice`, `pwListDevices`.
+  - Permissions / geo / headers / offline: `pwGrantPermissions`,
+    `pwClearPermissions`, `pwSetGeolocation`, `pwSetExtraHeaders`, `pwSetOffline`.
+  - Video: `pwGetVideo`, `pwSaveVideo`, `recordVideo` capability.
+  - Network event waiters: `pwWaitForRequest`, `pwWaitForResponse`.
+  - File chooser: `pwOnFileChooser` for native dialog handling.
+  - A11y: `pwAriaSnapshot`, `getElementComputedRole`, `getElementComputedLabel`.
+
+  **Tooling**
+
+  - `wdioPW` CLI — `install`, `trace`, `doctor`, `shard`.
+  - `installPerTestHooks({ mode })` — spec-level helper for per-test trace
+    - context isolation, no `wdio.conf.ts` edit required.
+  - TypeScript augmentation of `WebdriverIO.Browser` so `browser.pw*()` calls
+    type-check without casts.
+
+  **Stability**
+
+  - 228 vitest tests covering protocol commands, integration scenarios,
+    cross-browser smoke, and the auto-wait override layer.
+  - CI matrix: Ubuntu + macOS × Node 20 + 22.
+  - Documentation site at https://jemishgopani.github.io/wdio-pw-driver/.
+
 All notable changes to `wdio-pw-driver` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project does not yet follow strict SemVer (pre-1.0).
 
 ## [Unreleased]
 
 ### Added
+
 - **Suppress redundant WDIO WebDriver-binary downloads** — `PWService.onPrepare` now writes a sentinel value to `wdio:chromedriverOptions.binary` (and the geckodriver / edgedriver equivalents), which trips the truthy-binary guard in `@wdio/utils`'s `mapCapabilities` (`build/node.js:457`). WDIO's `setupDriver` filter then short-circuits, skipping the ~10MB chromedriver download that would otherwise happen on every run. Our driver dispatches every command via `playwright-core` in-process — the WebDriver binary was downloaded and never invoked. Browser binaries themselves were already skipped via the existing `goog:chromeOptions.binary` injection (which makes `setupPuppeteerBrowser` return early). Escape hatch: `wdio:pwOptions.skipDriverDownload: false` for mixed-protocol multiremote setups that need WDIO's real chromedriver path. Default: `true`.
 - **Playwright-native auto-wait for WDIO commands (PWService overrides)** — `PWService.before()` now transparently overrides `click`, `waitForExist`, and `waitForDisplayed` on every browser/element instance so they route through Playwright primitives. Users write standard WDIO and gain (a) `click(opts)` accepting Playwright's full option surface (`force`, `trial`, `position`, `timeout`, `button`, `modifiers`, `clickCount`, `delay`, `noWaitAfter`); (b) `waitForExist`/`waitForDisplayed` polling **inside the page** via `locator.waitFor({state})` instead of WDIO's protocol-roundtrip polling. The visibility check is also stricter — handles `content-visibility`, `aria-hidden`, animated layouts. Escape hatch: `wdio:pwOptions.strictActionability: false` skips the overrides for tests that relied on chromedriver's looser actionability.
 - **Internal protocol commands backing the overrides**: `pwClickElement(elementId, opts)` and `pwWaitElementFor(elementId, {state, timeout})`. Not user-visible; the overrides are the public surface.
@@ -20,11 +70,13 @@ All notable changes to `wdio-pw-driver` are documented here. Format follows [Kee
 - **Demo project polish** — `pw-demo/specs/pw-features.spec.ts` uses `installPerTestHooks` inline (Pattern 1); `pw-mobile.spec.ts` calls `pwSwitchDevice` from a `before` hook; `pw-features.spec.ts` self-navigates per test for isolation compatibility. Added per-test trace + video metrics flowing through `attachPWContext` → mochawesome report.
 
 ### Fixed
+
 - **`wdio.mobile.conf.ts` BridgeService import was broken** — service was renamed to `PWService` long ago but the mobile config still imported the old name. Updated import + services array entry. Config now runs end-to-end again.
 - **`pwNewContext()` deadlock on `context.close()` with active routes** (Playwright 1.59) — fire-and-forget the close so rotation completes immediately. Old context is reaped at `browser.close()` time. Documented in `troubleshooting.md`.
 - **Reporter HTML body was empty** when context was passed in marge-style `data.results` shape but the reporter writes `data.suites` (single root suite). `generateHtml` now accepts both shapes.
 
 ### Added (pw-demo only)
+
 - **Customized mochawesome HTML report.** Two layers:
   - **Theme**: `pw-demo/mochawesome.css` overrides mochawesome's CSS custom properties (`--brand-primary`, `--brand-success`, etc.) for a dark teal/magenta palette + branded gradient header (`body::before`). Re-styled summary cards, status pills, suite/test panels, code blocks, chartist bars/lines. `onComplete` copies the file into the report dir and idempotently injects `<link rel="stylesheet" href="mochawesome.css">` after `assets/app.css` so cascade order favors our overrides.
   - **Per-test metrics**: `specs/_pw-context.ts` exports `attachPWContext()` which reads `browser.capabilities` + calls `pwGetVideo()`, then emits `wdio-mochawesome-reporter:addContext` events with `{ title, value }` items: Browser engine + version, device preset, baseURL, Trace zip path, Video path, Duration. The `afterTest` hook in `wdio.conf.ts` calls it for every test. Verified end-to-end: each test in the report now has a context block with all six metrics.
@@ -36,6 +88,7 @@ All notable changes to `wdio-pw-driver` are documented here. Format follows [Kee
     5. Video field auto-rendered an inline `<video>` player loading 0:00 from a disk path the browser couldn't actually fetch. mochawesome's React renderer does extension-based detection via `/\.webm$/`. Fix: suffix the video path with ` (file)` in the context value to break end-of-string regex match — value renders as plain text instead.
 
 ### Added
+
 - **Type augmentation for `WebdriverIO.Browser` + `webdriverio.Browser`.** All `pw*` extension commands are now strongly typed on the `browser` object — no more `interface PWBrowser { ... }` + `as unknown as PWBrowser` cast in user specs. Augments both the global `WebdriverIO.Browser` (used by `@wdio/globals`) AND the module-level `Browser` exported from `webdriverio` (used by raw `remote()` setups). Activate in your project by adding a one-line `globals.d.ts` with `/// <reference types="wdio-pw-driver" />` and including it in your tsconfig's `include`. Example in `pw-demo/globals.d.ts`.
 - **`pwListDevices()` extension command** — returns Playwright's full device-descriptor registry as `Record<string, DeviceInfo>`. Useful for REPL discovery, building dropdowns of valid `pwSwitchDevice` arguments, or feature-detecting whether a specific preset ships with the user's `playwright-core` version. Verified in `pw-demo/specs/pw-mobile.spec.ts` (asserts iPhone 13 / Pixel 7 / Desktop Chrome presets + count > 100).
 - **`pwSaveVideo(path)` extension command** — wraps Playwright's `Video.saveAs()`. Saves the current page's video to a user-specified path. Per Playwright behavior, `saveAs()` waits for the page to close before resolving — pair it with `pwNewContext()` so the close actually happens (otherwise the call hangs until the test timeout). Returns `{ path }` or `{ path: null }` when recording is off.
@@ -51,9 +104,11 @@ All notable changes to `wdio-pw-driver` are documented here. Format follows [Kee
   - `wdio.video.conf.ts` + `specs/pw-video.spec.ts` (2 tests) — `recordVideo: { dir, size }` capability + `pwGetVideo()`. Verified `.webm` lands on disk after the run.
 
 ### Fixed
+
 - **`require('playwright-core')` in the device resolver broke the published ESM bundle.** Vitest masked it (transforms in-place, no bundling), but a real WDIO worker hit `Dynamic require of "playwright-core" is not supported` when launching with `device:` set. Switched to a static `import { devices } from 'playwright-core'` at the top of `capabilities.ts` — works identically in ESM and CJS bundles. Caught by running `pnpm wdio:mobile` end-to-end against the demo.
 
 ### Added (continued)
+
 - **Tier D — Playwright-feature exposure.** Closes a documented gap between PW and `@playwright/test` users: 5 capability passthroughs + 5 runtime context-mutation commands + 2 capture features.
   - **Capabilities** (in `wdio:pwOptions`):
     - `device: 'iPhone 13'` — resolves against Playwright's built-in `devices` registry (140+ presets); unknown names throw with a "did you mean?" hint.
@@ -101,6 +156,7 @@ All notable changes to `wdio-pw-driver` are documented here. Format follows [Kee
 Initial alpha. WDIO driver that drives Chromium / Firefox / WebKit via Playwright internals instead of chromedriver, while keeping the standard WDIO `browser.url`, `$()`, `click()` API surface.
 
 ### Added — driver internals
+
 - `PWDriver.newSession()` matching `webdriver/src/index.ts:WebDriver.newSession()` exactly so it's a drop-in replacement when `automationProtocol: 'wdio-pw-driver'` is set in WDIO config.
 - 56 W3C WebDriver Classic commands implemented across session / navigation / element find + actions + queries / executeScript / window / cookies / screenshot / frames / alerts / actions / print.
 - Element store with two-way Locator ↔ element-id mapping, separate shadow-root namespace using `SHADOW_ELEMENT_KEY`.
@@ -111,15 +167,18 @@ Initial alpha. WDIO driver that drives Chromium / Firefox / WebKit via Playwrigh
 - Alert handling via auto-handle snapshot model (works around Playwright's reactive-listener deadlock).
 
 ### Added — pw events
+
 - In-process W3C BiDi event pw — `Page.on('console'/'pageerror'/'request'/'response'/'framenavigated'/'load'/'domcontentloaded'/'dialog')` translated to BiDi-shaped emissions on the WDIO Client EventEmitter.
 - `sessionSubscribe` / `sessionUnsubscribe` (and `browsingContextGetTree` stub) so `browser.on('log.entryAdded', cb)` works without a real WebSocket.
 - Subscription gating — events only emitted when subscribed (zero-cost when nobody listens).
 
 ### Added — tracing (PW-specific extensions)
+
 - **Option A**: `wdio:pwOptions.trace: true` auto-starts `context.tracing` at session creation and writes `{traceDir}/{sessionId}.zip` on `deleteSession`. Configurable via `traceDir`, `traceSnapshots`, `traceScreenshots`, `traceSources`.
 - **Option B**: `pwStartTrace(opts?)` and `pwStopTrace(path?)` extension commands for explicit per-test control.
 
 ### Added — `wdioPW` CLI
+
 - `wdioPW install [browser...|all]` — download browser binaries; routes to `playwright-core/cli.js install`.
 - `wdioPW install-deps` — Linux OS-level browser dependencies.
 - `wdioPW uninstall` — remove the cached browser binaries.
@@ -128,16 +187,19 @@ Initial alpha. WDIO driver that drives Chromium / Firefox / WebKit via Playwrigh
 - Color output (auto-disabled when `NO_COLOR` set or stdout not a TTY).
 
 ### Performance
+
 - After the perf pass: PW headless ≈ 0.75 s/test, tied with native Playwright Test (0.74 s/test) across the OrangeHRM 52-test spec set. Faster than the W3C BiDi reference path (chromedriver) by ~10–15%.
 - Key wins: dropped redundant `ensureFresh()` pre-flight on every element command (saves 1 IPC), lighter `materializeAndRegister` using `loc.waitFor({state:'attached'})` instead of `elementHandle({timeout}) + dispose` (saves 1 IPC), `navigateTo` uses `waitUntil: 'domcontentloaded'` instead of `'load'` so SPAs return promptly.
 
 ### Tests
+
 - 116 driver tests (4 unit suites + smoke + Phase 2/3/4/5 integration + tracing + cross-browser + CLI).
 - 50+ tests per runner across two demo projects (`pw-demo`, `playwright-demo`) running the same OrangeHRM scenarios via PW / W3C BiDi / native Playwright Test for comparison.
 
 ### Known limitations
+
 - `playwright-core` is a peer dependency; visible in `package-lock.json` and `~/Library/Caches/ms-playwright/`. Branding is cleaned up but the dependency is not hidden — see Progress Log entry for the reasoning.
-- Alert API has W3C-deviation costs: to make `confirm()` return false or send text to `prompt()`, tests must call `dismissAlert()` / `sendAlertText()` *before* triggering the dialog, not after.
+- Alert API has W3C-deviation costs: to make `confirm()` return false or send text to `prompt()`, tests must call `dismissAlert()` / `sendAlertText()` _before_ triggering the dialog, not after.
 - BiDi commands beyond the four shipped (`sessionSubscribe`, `sessionUnsubscribe`, `browsingContextGetTree`, plus the events) throw `NotImplementedError`. Expand on demand.
 
 [Unreleased]: ../../compare/v0.1.0-alpha.0...HEAD

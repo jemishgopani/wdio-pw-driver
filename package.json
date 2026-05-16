@@ -1,6 +1,6 @@
 {
   "name": "wdio-pw-driver",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-beta.1",
   "description": "WebdriverIO driver powered by Playwright internals — drives Chromium / Firefox / WebKit in-process, no chromedriver, no HTTP. Same WDIO API.",
   "type": "module",
   "author": "jemishgopani <jemishgopani2@gmail.com>",
