@@ -9,7 +9,7 @@ The WDIO launcher service that auto-resolves Playwright's browser binary path an
 ## Install
 
 ```ts
-import PWService from 'wdio-pw-driver'
+import { PWService } from 'wdio-pw-driver'
 
 export const config = {
   // ...

@@ -31,7 +31,7 @@ npx wdioPW install all        # chromium + firefox + webkit
 ## 30-second setup
 
 ```ts title="wdio.conf.ts"
-import PWService from 'wdio-pw-driver'
+import { PWService } from 'wdio-pw-driver'
 
 export const config = {
   runner: 'local',

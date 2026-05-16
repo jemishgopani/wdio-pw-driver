@@ -3,7 +3,7 @@
  * browser-binary path and injects it into each capability set before
  * WDIO's own launcher tries to download its own Chromium.
  *
- *   import PWService from 'wdio-pw-driver'
+ *   import { PWService } from 'wdio-pw-driver'
  *
  *   services: [[PWService, {}]]
  *

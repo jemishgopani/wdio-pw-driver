@@ -10,7 +10,7 @@ Everything you can put in your WDIO config to customize PW driver behavior. All 
 
 ```ts
 // wdio.conf.ts
-import PWService from 'wdio-pw-driver'
+import { PWService } from 'wdio-pw-driver'
 
 export const config = {
   runner: 'local',

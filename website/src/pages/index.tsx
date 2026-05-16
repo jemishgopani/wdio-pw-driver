@@ -78,7 +78,7 @@ function Features(): ReactNode {
 }
 
 const QUICKSTART = `// wdio.conf.ts
-import PWService from 'wdio-pw-driver'
+import { PWService } from 'wdio-pw-driver'
 
 export const config = {
   runner: 'local',

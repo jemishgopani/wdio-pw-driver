@@ -86,7 +86,7 @@ The demo ships `pw-demo/wdio.isolated.conf.ts`. The minimal shape:
 
 ```ts
 // wdio.isolated.conf.ts
-import PWService from 'wdio-pw-driver'
+import { PWService } from 'wdio-pw-driver'
 import { attachPWContext } from './specs/_pw-context.js'
 
 export const config = {
